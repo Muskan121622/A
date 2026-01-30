@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS, cross_origin
 import joblib
 import pandas as pd
@@ -144,10 +144,23 @@ def verify_plant_with_groq(image_path):
         return True, f"Verification skipped (Error: {str(e)})" # Fail open on error
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True) # Enable CORS for all routes
+CORS(app, resources={r"/*": {"origins": "*"}}) # Enable CORS for all routes
 
 # Initialize voice assistant
 voice_assistant = AgriVoiceAssistant()
+
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
+
+@app.before_request
+def handle_options():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
 
 # Lazy loading for yield models (load only when needed)
 yield_models_loaded = False
@@ -457,23 +470,70 @@ def detect_disease():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def smart_disease_lookup(disease_name, dictionary, default_value):
+    """
+    Smart lookup that handles specific names (e.g. Potato___early_blight)
+    by trying exact match -> healthy -> mapped keywords -> default
+    """
+    if not disease_name:
+        return default_value
+        
+    # 1. Exact match
+    if disease_name in dictionary:
+        return dictionary[disease_name]
+        
+    name_lower = disease_name.lower()
+    
+    # 2. Healthy check
+    if 'healthy' in name_lower:
+        return dictionary.get('healthy', default_value)
+        
+    # 3. Keyword mapping to generic keys
+    keyword_map = {
+        'early_blight': 'leaf_blight',
+        'late_blight': 'leaf_blight', # Could be more specific if dict supported it
+        'blight': 'leaf_blight',
+        'rust': 'leaf_rust',
+        'scab': 'scab',
+        'powdery_mildew': 'powdery_mildew',
+        'downy_mildew': 'downy_mildew',
+        'mold': 'leaf_mold',
+        'mildew': 'powdery_mildew',
+        'mosaic': 'viral_disease',
+        'virus': 'viral_disease',
+        'mite': 'pest_infected',
+        'spot': 'leaf_spot',
+        'rot': 'rot',
+        'wilt': 'bacterial_wilt',
+        'curl': 'viral_disease',
+        'anthracnose': 'anthracnose'
+    }
+    
+    for keyword, target_key in keyword_map.items():
+        if keyword in name_lower:
+            return dictionary.get(target_key, default_value)
+            
+    return default_value
+
 def get_treatment_recommendation(disease):
     treatments = {
         'healthy': 'No treatment needed - plant is healthy',
         'leaf_blight': 'Apply copper-based fungicide every 7-10 days, improve air circulation',
         'leaf_rust': 'Apply systemic fungicide, remove infected leaves',
         'leaf_spot': 'Apply fungicide spray, ensure proper plant spacing',
+        'leaf_mold': 'Improve ventilation, reduce humidity, apply fungicide',
         'nutrient_deficiency': 'Apply appropriate fertilizer based on soil test',
         'pest_infected': 'Use integrated pest management - beneficial insects and organic sprays',
         'stem_rot': 'Remove infected plants, apply fungicide to healthy plants',
         'rot': 'Remove infected parts, improve drainage, apply fungicide',
         'viral_disease': 'Remove infected plants, control insect vectors, use resistant varieties',
         'powdery_mildew': 'Apply sulfur-based fungicide, improve air circulation',
+        'downy_mildew': 'Apply systemic fungicide, reduce humidity, improve drainage',
         'scab': 'Apply fungicide spray, remove fallen leaves, prune for air circulation',
         'anthracnose': 'Apply copper fungicide, remove infected debris, avoid overhead watering',
-        'downy_mildew': 'Apply systemic fungicide, reduce humidity, improve drainage'
+        'bacterial_wilt': 'Remove infected plants immediately, solarize soil, rotate crops'
     }
-    return treatments.get(disease, 'Consult agricultural expert')
+    return smart_disease_lookup(disease, treatments, 'Consult agricultural expert')
 
 def get_affected_part(disease):
     parts = {
@@ -481,17 +541,19 @@ def get_affected_part(disease):
         'leaf_blight': 'leaf',
         'leaf_rust': 'leaf',
         'leaf_spot': 'leaf',
+        'leaf_mold': 'leaf',
         'nutrient_deficiency': 'whole_plant',
         'pest_infected': 'multiple',
         'stem_rot': 'stem',
         'rot': 'fruit_stem',
         'viral_disease': 'whole_plant',
         'powdery_mildew': 'leaf',
+        'downy_mildew': 'leaf',
         'scab': 'fruit_leaf',
         'anthracnose': 'fruit_leaf',
-        'downy_mildew': 'leaf'
+        'bacterial_wilt': 'whole_plant'
     }
-    return parts.get(disease, 'unknown')
+    return smart_disease_lookup(disease, parts, 'unknown')
 
 def get_symptoms(disease):
     symptoms = {
@@ -499,17 +561,19 @@ def get_symptoms(disease):
         'leaf_blight': ['Brown spots with yellow halos', 'Wilting leaves', 'Premature leaf drop'],
         'leaf_rust': ['Orange-red pustules on leaf undersides', 'Yellow spots on upper surface'],
         'leaf_spot': ['Circular spots on leaves', 'Spots may have dark borders'],
+        'leaf_mold': ['Pale yellow spots on upper leaf', 'Olive-green mold on underside'],
         'nutrient_deficiency': ['Yellowing of older leaves', 'Stunted growth', 'Poor fruit development'],
         'pest_infected': ['Holes in leaves', 'Sticky residue', 'Distorted growth'],
         'stem_rot': ['Dark, water-soaked lesions on stem', 'Soft, mushy tissue'],
         'rot': ['Soft, decaying tissue', 'Foul odor', 'Discoloration'],
         'viral_disease': ['Mosaic patterns on leaves', 'Stunted growth', 'Leaf curling', 'Yellow streaks'],
         'powdery_mildew': ['White powdery coating on leaves', 'Distorted leaves', 'Reduced growth'],
+        'downy_mildew': ['Yellow patches on upper leaf surface', 'Gray fuzzy growth on undersides'],
         'scab': ['Dark, rough lesions on fruit', 'Corky spots on leaves'],
         'anthracnose': ['Dark sunken lesions', 'Fruit rot', 'Leaf spots with dark margins'],
-        'downy_mildew': ['Yellow patches on upper leaf surface', 'Gray fuzzy growth on undersides']
+        'bacterial_wilt': ['Rapid wilting of leaves', 'Stems remain green', 'White ooze from cut stems']
     }
-    return symptoms.get(disease, ['Symptoms not specified'])
+    return smart_disease_lookup(disease, symptoms, ['Symptoms not specified'])
 
 def get_preventive_measures(disease):
     measures = {
@@ -517,17 +581,19 @@ def get_preventive_measures(disease):
         'leaf_blight': ['Avoid overhead watering', 'Remove infected debris', 'Plant resistant varieties'],
         'leaf_rust': ['Ensure good air circulation', 'Avoid high humidity', 'Use resistant cultivars'],
         'leaf_spot': ['Avoid overhead watering', 'Ensure proper plant spacing', 'Remove infected leaves'],
+        'leaf_mold': ['Improve air circulation', 'Use drip irrigation', 'Sanitize tools'],
         'nutrient_deficiency': ['Regular soil testing', 'Balanced fertilization', 'Proper irrigation'],
         'pest_infected': ['Crop rotation', 'Beneficial insects', 'Regular monitoring'],
         'stem_rot': ['Improve drainage', 'Avoid overwatering', 'Use pathogen-free seeds'],
         'rot': ['Proper storage conditions', 'Avoid mechanical damage', 'Good sanitation'],
         'viral_disease': ['Control insect vectors', 'Use virus-free planting material', 'Remove infected plants'],
         'powdery_mildew': ['Reduce humidity', 'Improve air circulation', 'Avoid dense planting'],
+        'downy_mildew': ['Improve drainage', 'Reduce leaf wetness', 'Use resistant varieties'],
         'scab': ['Remove fallen leaves', 'Prune for air flow', 'Apply preventive fungicides'],
         'anthracnose': ['Crop rotation', 'Remove plant debris', 'Avoid overhead irrigation'],
-        'downy_mildew': ['Improve drainage', 'Reduce leaf wetness', 'Use resistant varieties']
+        'bacterial_wilt': ['Use resistant varieties', 'Control nematodes', 'Crop rotation']
     }
-    return measures.get(disease, ['Follow good agricultural practices'])
+    return smart_disease_lookup(disease, measures, ['Follow good agricultural practices'])
 
 def get_economic_impact(disease):
     impacts = {
@@ -535,17 +601,19 @@ def get_economic_impact(disease):
         'leaf_blight': 'Can reduce yield by 20-40% if untreated',
         'leaf_rust': 'Yield loss of 15-30% in severe cases',
         'leaf_spot': 'Yield reduction of 10-25% depending on severity',
+        'leaf_mold': 'Yield loss of 10-20% in greenhouse conditions',
         'nutrient_deficiency': 'Reduced yield and quality, increased input costs',
         'pest_infected': 'Yield loss varies by pest type and infestation level',
         'stem_rot': 'Complete plant loss in severe infections',
         'rot': 'Post-harvest losses of 30-50%, reduced market value',
         'viral_disease': 'Severe yield loss 40-100%, no cure available',
         'powdery_mildew': 'Yield reduction of 10-30%, quality degradation',
+        'downy_mildew': 'Yield loss of 20-50% in favorable conditions',
         'scab': 'Reduced fruit quality and marketability, 20-40% loss',
         'anthracnose': 'Significant fruit losses 30-60%, quality issues',
-        'downy_mildew': 'Yield loss of 20-50% in favorable conditions'
+        'bacterial_wilt': 'Total crop loss possible, 30-100% reduction'
     }
-    return impacts.get(disease, 'Economic impact varies')
+    return smart_disease_lookup(disease, impacts, 'Economic impact varies')
 
 @app.route('/voice-query', methods=['POST'])
 def handle_voice_query():
@@ -834,8 +902,11 @@ def save_listings(listings):
     with open(LISTINGS_FILE, 'w') as f:
         json.dump(listings, f, indent=4)
 
-@app.route('/listings', methods=['GET', 'POST'])
+@app.route('/listings', methods=['GET', 'POST', 'OPTIONS'])
 def handle_listings():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
     if request.method == 'GET':
         listings = load_listings()
         return jsonify(listings)
@@ -1139,8 +1210,10 @@ def generate_digital_twin_with_groq(farm_data):
         return False, str(e)
 
 @app.route('/analyze-health', methods=['POST', 'OPTIONS'])
-@cross_origin()
 def analyze_health():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
     """
     Analyze overall plant health using Groq based on detected issues.
     """

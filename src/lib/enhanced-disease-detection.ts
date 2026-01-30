@@ -134,7 +134,12 @@ export class EnhancedDiseaseDetector {
 
 
       // Calculate overall health score using Groq API
-      let overallHealth;
+      // Calculate overall health score LOCALLY for instant results
+      // The backend API call is too slow (llama 70b). We already have rich metadata.
+      let overallHealth = this.calculateOverallHealthFallback(diseases, pests, nutrientDeficiency, soilAnalysis);
+
+      // Optional: We could call the API in background if needed, but for now, instant is better.
+      /*
       try {
         const healthResponse = await fetch('http://localhost:5000/analyze-health', {
           method: 'POST',
@@ -149,13 +154,11 @@ export class EnhancedDiseaseDetector {
 
         if (healthResponse.ok) {
           overallHealth = await healthResponse.json();
-        } else {
-          throw new Error("Health API failed");
         }
       } catch (err) {
-        console.warn("Using fallback health calculation:", err);
-        overallHealth = this.calculateOverallHealthFallback(diseases, pests, nutrientDeficiency, soilAnalysis);
+        console.warn("Health API failed, using fallback:", err);
       }
+      */
 
       return {
         diseases,
@@ -213,61 +216,19 @@ export class EnhancedDiseaseDetector {
   }
 
   private generateDiseaseResultsFromAPI(apiResult: any, plantPart: string): DetectionResult[] {
-    // Use the API result to generate disease results
-    const disease = apiResult.disease;
-    const confidence = apiResult.confidence;
-    const severity = apiResult.severity;
-
-    // Map the API disease to our expected format
-    const diseaseMapping: { [key: string]: any } = {
-      'healthy': {
-        disease: 'healthy',
-        symptoms: ['No visible symptoms'],
-        treatment: 'No treatment needed - plant is healthy',
-        preventiveMeasures: ['Continue good agricultural practices'],
-        economicImpact: 'No economic impact'
-      },
-      'leaf_blight': {
-        disease: 'leaf_blight',
-        symptoms: ['Brown spots with yellow halos', 'Wilting leaves', 'Premature leaf drop'],
-        treatment: 'Apply copper-based fungicide every 7-10 days, improve air circulation',
-        preventiveMeasures: ['Avoid overhead watering', 'Remove infected debris', 'Plant resistant varieties'],
-        economicImpact: 'Can reduce yield by 20-40% if untreated'
-      },
-      'leaf_rust': {
-        disease: 'leaf_rust',
-        symptoms: ['Orange-red pustules on leaf undersides', 'Yellow spots on upper surface', 'Stunted growth'],
-        treatment: 'Apply systemic fungicide, remove infected leaves',
-        preventiveMeasures: ['Ensure good air circulation', 'Avoid high humidity', 'Use resistant cultivars'],
-        economicImpact: 'Yield loss of 15-30% in severe cases'
-      },
-      'leaf_spot': {
-        disease: 'leaf_spot',
-        symptoms: ['Circular spots on leaves', 'Spots may have dark borders'],
-        treatment: 'Apply fungicide spray, ensure proper plant spacing',
-        preventiveMeasures: ['Avoid overhead watering', 'Ensure proper plant spacing', 'Remove infected leaves'],
-        economicImpact: 'Yield reduction of 10-25% depending on severity'
-      },
-      'stem_rot': {
-        disease: 'stem_rot',
-        symptoms: ['Dark, water-soaked lesions on stem', 'Soft, mushy tissue', 'Plant wilting'],
-        treatment: 'Remove infected plants, apply fungicide to healthy plants',
-        preventiveMeasures: ['Improve drainage', 'Avoid overwatering', 'Use pathogen-free seeds'],
-        economicImpact: 'Complete plant loss in severe infections'
-      }
-    };
-
-    const diseaseInfo = diseaseMapping[disease] || diseaseMapping['healthy'];
+    // CRITICAL: Use the metadata provided by the API directly.
+    // The backend now performs "smart lookup" to provide symptoms, treatment etc.
+    // We should only fallback if the API *didn't* provide them.
 
     return [{
-      disease: diseaseInfo.disease,
-      confidence: confidence,
-      severity: severity as 'low' | 'medium' | 'high',
-      treatment: diseaseInfo.treatment,
-      affectedPart: plantPart as 'leaf' | 'stem' | 'fruit' | 'soil',
-      symptoms: diseaseInfo.symptoms,
-      preventiveMeasures: diseaseInfo.preventiveMeasures,
-      economicImpact: diseaseInfo.economicImpact
+      disease: apiResult.disease,
+      confidence: apiResult.confidence,
+      severity: (apiResult.severity || 'medium') as 'low' | 'medium' | 'high',
+      treatment: apiResult.treatment || 'Consult agricultural expert',
+      affectedPart: (apiResult.affectedPart || plantPart || 'leaf') as 'leaf' | 'stem' | 'fruit' | 'soil',
+      symptoms: apiResult.symptoms || ['Symptoms not specified'],
+      preventiveMeasures: apiResult.preventiveMeasures || ['Practice good agricultural hygiene'],
+      economicImpact: apiResult.economicImpact || 'Economic impact varies'
     }];
   }
 
@@ -478,80 +439,76 @@ export class EnhancedDiseaseDetector {
     let score = 100;
     const recommendations: string[] = [];
 
-    // Check if the plant is healthy with high confidence
-    const isHealthy = diseases.length === 1 && diseases[0].disease === 'healthy' && diseases[0].confidence > 0.9;
+    // 1. Analyze Diseases
+    if (diseases.length > 0) {
+      const primaryDisease = diseases[0];
 
-    if (isHealthy) {
-      // For healthy plants with high confidence, give a high score regardless of other factors
-      score = Math.min(100, 95 + Math.floor(diseases[0].confidence * 5));
-      recommendations.push('Plant is healthy - continue current practices');
-    } else {
-      // For diseased plants or low confidence healthy classification, calculate normally
-
-      diseases.forEach(disease => {
-        // Don't deduct points for healthy plants
-        if (disease.disease !== 'healthy') {
-          const deduction = disease.severity === 'high' ? 25 : disease.severity === 'medium' ? 15 : 5;
-          score -= deduction;
-          // Only add immediate action recommendation for medium/high severity
-          if (disease.severity === 'high' || disease.severity === 'medium') {
-            recommendations.push(`Address ${disease.disease} immediately`);
-          } else {
-            recommendations.push(`Monitor for ${disease.disease} symptoms`);
-          }
+      if (primaryDisease.disease.toLowerCase().includes('healthy')) {
+        // Boost score for high confidence healthy
+        if (primaryDisease.confidence > 0.8) {
+          score = 98;
+          recommendations.push('Plant is healthy. Continue current irrigation and fertilization schedule.');
         } else {
-          // For healthy plants with lower confidence, still add positive recommendation
-          recommendations.push('Plant appears healthy - continue current practices');
+          score = 85;
+          recommendations.push('Plant looks mostly healthy, but monitor for early signs of stress.');
         }
-      });
-
-      pests.forEach(pest => {
-        const deduction = pest.severity === 'high' ? 20 : pest.severity === 'medium' ? 12 : 4;
-        score -= deduction;
-        recommendations.push(`Implement IPM for ${pest.pest}`);
-      });
-
-      nutrients.forEach(nutrient => {
-        const deduction = nutrient.severity === 'high' ? 15 : nutrient.severity === 'medium' ? 10 : 3;
-        score -= deduction;
-        recommendations.push(`Correct ${nutrient.nutrient}`);
-      });
-
-      if (soil.fertility === 'low') score -= 10;
-      if (soil.drainage === 'poor') score -= 8;
-
-      score = Math.max(0, Math.min(100, score));
-    }
-
-    let status: 'critical' | 'poor' | 'fair' | 'good' | 'excellent' = score >= 95 ? 'excellent' :
-      score >= 85 ? 'good' :
-        score >= 70 ? 'fair' :
-          score >= 50 ? 'poor' : 'critical';
-
-    // Special case for high confidence healthy plants
-    if (isHealthy) {
-      status = score >= 98 ? 'excellent' : 'good';
-      recommendations.splice(0, recommendations.length, 'Plant health is excellent - maintain current practices');
-    } else {
-      // Check if all recommendations are positive (for healthy plants)
-      const hasNegativeRecommendations = recommendations.some(rec => rec.startsWith('Address') || rec.startsWith('Implement') || rec.startsWith('Correct'));
-      const hasMonitoringRecommendations = recommendations.some(rec => rec.startsWith('Monitor for'));
-
-      if (!hasNegativeRecommendations && !hasMonitoringRecommendations) {
-        // All recommendations are positive, so plant is healthy
-        recommendations.splice(0, recommendations.length, 'Plant health is excellent - maintain current practices');
-      } else if (hasMonitoringRecommendations && !hasNegativeRecommendations) {
-        // Only monitoring recommendations, adjust message accordingly
-        recommendations.splice(0, recommendations.length, ...recommendations.filter(rec => rec.startsWith('Monitor for')), 'Plant health is good - monitor for potential issues');
       } else {
-        // If there are negative recommendations, adjust the status message to be more realistic
-        if (status === 'excellent' && (hasNegativeRecommendations || hasMonitoringRecommendations)) {
-          status = 'good';
+        // Deduct points based on severity and disease type
+        let impact = 15; // Base impact
+        if (primaryDisease.severity === 'high') impact = 40;
+        if (primaryDisease.severity === 'medium') impact = 25;
+
+        // Critical diseases
+        if (primaryDisease.disease.includes('blight') || primaryDisease.disease.includes('rot') || primaryDisease.disease.includes('wilt')) {
+          impact += 15;
+        }
+
+        score -= impact;
+
+        // Add specific recommendations from the disease metadata
+        if (primaryDisease.treatment && primaryDisease.treatment !== 'Consult agricultural expert') {
+          recommendations.push(`Treatment: ${primaryDisease.treatment}`);
+        }
+        if (primaryDisease.preventiveMeasures && primaryDisease.preventiveMeasures.length > 0) {
+          recommendations.push(`Prevention: ${primaryDisease.preventiveMeasures[0]}`);
         }
       }
     }
 
-    return { score, status, recommendations };
+    // 2. Analyze Pests (Mock/Random in this context, but logic holds)
+    if (pests.length > 0) {
+      score -= 20;
+      recommendations.push(`Pest Alert: ${pests[0].pest} detected. ${pests[0].treatment}`);
+    }
+
+    // 3. Analyze Nutrients
+    if (nutrients.length > 0) {
+      score -= 10;
+      recommendations.push(`Nutrient Deficiency: ${nutrients[0].nutrient}. ${nutrients[0].treatment}`);
+    }
+
+    // Unify score range
+    score = Math.max(0, Math.min(100, score));
+
+    // Determine status
+    let status: 'critical' | 'poor' | 'fair' | 'good' | 'excellent' = 'good';
+    if (score >= 90) status = 'excellent';
+    else if (score >= 75) status = 'good';
+    else if (score >= 50) status = 'fair';
+    else if (score >= 25) status = 'poor';
+    else status = 'critical';
+
+    // Fallback recommendation if empty
+    if (recommendations.length === 0) {
+      recommendations.push('Monitor plant growth regularly.');
+      recommendations.push('Ensure proper hydration and sunlight.');
+    }
+
+    return {
+      score,
+      status,
+      recommendations: recommendations.slice(0, 4) // Limit to top 4
+    };
   }
 
   private assessImageQuality(): 'poor' | 'fair' | 'good' | 'excellent' {

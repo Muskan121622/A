@@ -89,10 +89,21 @@ def extract_features(image_path):
         print(f"Error processing {image_path}: {e}")
         return None
 
-def predict_disease(image_path, model_path="model.pkl", labels_path="labels.json"):
+def predict_disease(image_path, model_path=None, labels_path=None):
     """
     Predict plant disease from image
     """
+    import os
+    
+    # Determine script directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Default paths relative to script location
+    if model_path is None:
+        model_path = os.path.join(script_dir, "model.pkl")
+    if labels_path is None:
+        labels_path = os.path.join(script_dir, "labels.json")
+        
     # Load model and labels
     model = joblib.load(model_path)
     

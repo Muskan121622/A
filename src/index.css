@@ -1,0 +1,194 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+
+    /* AgriSphere AI Brand Colors */
+    --primary: 142 76% 36%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 142 76% 56%;
+    
+    --secondary: 47 96% 53%;
+    --secondary-foreground: 240 10% 3.9%;
+    --secondary-glow: 47 96% 73%;
+
+    --accent: 199 89% 48%;
+    --accent-foreground: 0 0% 100%;
+    --accent-glow: 199 89% 68%;
+
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 142 76% 36%;
+
+    --radius: 0.75rem;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(142 76% 36%) 0%, hsl(142 76% 56%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(47 96% 53%) 0%, hsl(47 96% 73%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(199 89% 48%) 0%, hsl(199 89% 68%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(142 76% 36%) 0%, hsl(199 89% 48%) 100%);
+    --gradient-mesh: radial-gradient(at 40% 20%, hsl(142 76% 56% / 0.3) 0px, transparent 50%),
+                     radial-gradient(at 80% 0%, hsl(199 89% 68% / 0.3) 0px, transparent 50%),
+                     radial-gradient(at 0% 50%, hsl(47 96% 73% / 0.3) 0px, transparent 50%);
+
+    /* Shadows & Glows */
+    --shadow-sm: 0 1px 2px 0 hsl(240 5.9% 10% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(240 5.9% 10% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(240 5.9% 10% / 0.1);
+    --shadow-xl: 0 20px 25px -5px hsl(240 5.9% 10% / 0.1);
+    --shadow-glow-primary: 0 0 40px hsl(142 76% 56% / 0.4);
+    --shadow-glow-secondary: 0 0 40px hsl(47 96% 73% / 0.4);
+    --shadow-glow-accent: 0 0 40px hsl(199 89% 68% / 0.4);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 10% 7%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 7%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 142 76% 46%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 142 76% 66%;
+    
+    --secondary: 47 96% 63%;
+    --secondary-foreground: 240 10% 3.9%;
+    --secondary-glow: 47 96% 83%;
+
+    --accent: 199 89% 58%;
+    --accent-foreground: 0 0% 100%;
+    --accent-glow: 199 89% 78%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 142 76% 46%;
+
+    /* Dark mode gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(142 76% 46%) 0%, hsl(142 76% 66%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(47 96% 63%) 0%, hsl(47 96% 83%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(199 89% 58%) 0%, hsl(199 89% 78%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(142 76% 46%) 0%, hsl(199 89% 58%) 100%);
+    --gradient-mesh: radial-gradient(at 40% 20%, hsl(142 76% 66% / 0.2) 0px, transparent 50%),
+                     radial-gradient(at 80% 0%, hsl(199 89% 78% / 0.2) 0px, transparent 50%),
+                     radial-gradient(at 0% 50%, hsl(47 96% 83% / 0.2) 0px, transparent 50%);
+
+    --shadow-glow-primary: 0 0 60px hsl(142 76% 66% / 0.5);
+    --shadow-glow-secondary: 0 0 60px hsl(47 96% 83% / 0.5);
+    --shadow-glow-accent: 0 0 60px hsl(199 89% 78% / 0.5);
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  .glow-primary {
+    box-shadow: var(--shadow-glow-primary);
+  }
+  
+  .glow-secondary {
+    box-shadow: var(--shadow-glow-secondary);
+  }
+  
+  .glow-accent {
+    box-shadow: var(--shadow-glow-accent);
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-primary);
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-glow-pulse {
+    animation: glow-pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+  }
+
+  @keyframes glow-pulse {
+    0%, 100% { opacity: 1; filter: blur(20px); }
+    50% { opacity: 0.8; filter: blur(30px); }
+  }
+
+  .glass {
+    @apply bg-background/20 backdrop-blur-md border border-white/20;
+  }
+
+  .glass-morphism {
+    @apply bg-white/10 backdrop-blur-xl border border-white/20 shadow-xl;
+  }
+
+  .glass-dark {
+    @apply bg-black/40 backdrop-blur-xl border border-white/10 shadow-2xl;
+  }
+}

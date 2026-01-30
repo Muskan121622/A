@@ -1,0 +1,6 @@
+{
+  "dataset_path": "public\\archive (4)\\data",
+  "output_dir": "light_archive4_output",
+  "analysis_date": "2025-12-06",
+  "notes": "This is a lightweight analysis of the Archive4 dataset without actual model training"
+}

@@ -1,0 +1,79 @@
+{
+  "training_date": "2025-11-27 22:13:41",
+  "dataset_info": {
+    "total_records": 2660,
+    "date_range": "2010 - 2023",
+    "unique_crops": 5,
+    "unique_districts": 38,
+    "crops": [
+      "jute",
+      "maize",
+      "rice",
+      "sugarcane",
+      "wheat"
+    ],
+    "districts": [
+      "Araria",
+      "Arwal",
+      "Aurangabad",
+      "Banka",
+      "Begusarai",
+      "Bhagalpur",
+      "Bhojpur",
+      "Buxar",
+      "Darbhanga",
+      "East Champaran",
+      "Gaya",
+      "Gopalganj",
+      "Jamui",
+      "Jehanabad",
+      "Kaimur",
+      "Katihar",
+      "Khagaria",
+      "Kishanganj",
+      "Lakhisarai",
+      "Madhepura",
+      "Madhubani",
+      "Munger",
+      "Muzaffarpur",
+      "Nalanda",
+      "Nawada",
+      "Patna",
+      "Purnia",
+      "Rohtas",
+      "Saharsa",
+      "Samastipur",
+      "Saran",
+      "Sheikhpura",
+      "Sheohar",
+      "Sitamarhi",
+      "Siwan",
+      "Supaul",
+      "Vaishali",
+      "West Champaran"
+    ]
+  },
+  "model_performance": {
+    "Random Forest": {
+      "test_r2": 0.9889305166415602,
+      "test_rmse": 2216.899708646919,
+      "test_mae": 888.5604198033378,
+      "cv_mean": 0.9856743308000404,
+      "cv_std": 0.002469763429013203
+    },
+    "Gradient Boosting": {
+      "test_r2": 0.9938483130907927,
+      "test_rmse": 1652.6446513718204,
+      "test_mae": 648.8994585828954,
+      "cv_mean": 0.9878861133086764,
+      "cv_std": 0.0023075811110685176
+    },
+    "Linear Regression": {
+      "test_r2": 0.9866493551327016,
+      "test_rmse": 2434.6329324935823,
+      "test_mae": 1240.2400265451984,
+      "cv_mean": 0.9854031275019338,
+      "cv_std": 0.0023877219498606604
+    }
+  }
+}

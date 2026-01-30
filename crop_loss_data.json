@@ -1,0 +1,85 @@
+[
+    {
+        "id": "case_b7f93bee",
+        "farmerName": "muskan",
+        "crop": "Rice",
+        "season": "Kharif",
+        "damagePercentage": 50.0,
+        "cause": "Drought",
+        "status": "Under Verification",
+        "timestamp": "2026-01-09T03:00:06.913388",
+        "location": "takyel, imphal, Manipur",
+        "estimatedLoss": 134750,
+        "suggestedCompensation": 94325,
+        "isEligible": true,
+        "suggestedScheme": "State Disaster Relief Fund (SDRF)",
+        "advisoryCompliance": {
+            "fertilizer": true,
+            "irrigation": true,
+            "pestControl": true
+        },
+        "evidence": null
+    },
+    {
+        "id": "case_c242b896",
+        "farmerName": "Farmer A",
+        "crop": "Cotton",
+        "damagePercentage": 53,
+        "cause": "Pest Attack (Pink Bollworm)",
+        "status": "Approved",
+        "timestamp": "2026-01-07T23:58:26.845633",
+        "location": "Maharashtra",
+        "estimatedLoss": 186593,
+        "suggestedCompensation": 130615
+    },
+    {
+        "id": "case_016a7400",
+        "farmerName": "Farmer B",
+        "crop": "Wheat",
+        "damagePercentage": 49,
+        "cause": "Flooding",
+        "status": "Under Verification",
+        "timestamp": "2026-01-07T23:58:26.845633",
+        "location": "Haryana",
+        "estimatedLoss": 117739,
+        "suggestedCompensation": 82417
+    },
+    {
+        "id": "case_bd5d8a7c",
+        "farmerName": "Farmer C",
+        "crop": "Potato",
+        "damagePercentage": 88,
+        "cause": "Unexpected Hailstorm",
+        "status": "Under Verification",
+        "timestamp": "2026-01-07T23:58:26.845633",
+        "location": "Punjab",
+        "estimatedLoss": 66111,
+        "suggestedCompensation": 46277,
+        "verificationRequestedAt": "2026-01-08T01:56:48.993231"
+    },
+    {
+        "id": "case_9695ae36",
+        "farmerName": "Farmer D",
+        "crop": "Potato",
+        "damagePercentage": 79,
+        "cause": "Flooding",
+        "status": "Under Verification",
+        "timestamp": "2026-01-07T23:58:26.845633",
+        "location": "Madhya Pradesh",
+        "estimatedLoss": 67287,
+        "suggestedCompensation": 47100,
+        "verificationRequestedAt": "2026-01-08T05:06:41.399342"
+    },
+    {
+        "id": "case_775315fe",
+        "farmerName": "Farmer E",
+        "crop": "Cotton",
+        "damagePercentage": 58,
+        "cause": "Unexpected Hailstorm",
+        "status": "Rejected",
+        "timestamp": "2026-01-07T23:58:26.845633",
+        "location": "Punjab",
+        "estimatedLoss": 192250,
+        "suggestedCompensation": 134575
+    }
+]

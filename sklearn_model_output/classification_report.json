@@ -1,0 +1,57 @@
+{
+  "healthy": {
+    "precision": 0.7719298245614035,
+    "recall": 0.66,
+    "f1-score": 0.7115902964959568,
+    "support": 200.0
+  },
+  "leaf_blight": {
+    "precision": 0.7354497354497355,
+    "recall": 0.695,
+    "f1-score": 0.7146529562982005,
+    "support": 200.0
+  },
+  "leaf_rust": {
+    "precision": 0.9139784946236559,
+    "recall": 0.85,
+    "f1-score": 0.8808290155440415,
+    "support": 200.0
+  },
+  "leaf_spot": {
+    "precision": 0.7222222222222222,
+    "recall": 0.65,
+    "f1-score": 0.6842105263157895,
+    "support": 200.0
+  },
+  "nutrient_deficiency": {
+    "precision": 0.7123287671232876,
+    "recall": 0.78,
+    "f1-score": 0.7446300715990454,
+    "support": 200.0
+  },
+  "pest_infected": {
+    "precision": 0.9141414141414141,
+    "recall": 0.905,
+    "f1-score": 0.9095477386934674,
+    "support": 200.0
+  },
+  "stem_rot": {
+    "precision": 0.6770428015564203,
+    "recall": 0.87,
+    "f1-score": 0.7614879649890591,
+    "support": 200.0
+  },
+  "accuracy": 0.7728571428571429,
+  "macro avg": {
+    "precision": 0.77815617995402,
+    "recall": 0.7728571428571429,
+    "f1-score": 0.7724212242765086,
+    "support": 1400.0
+  },
+  "weighted avg": {
+    "precision": 0.7781561799540199,
+    "recall": 0.7728571428571429,
+    "f1-score": 0.7724212242765085,
+    "support": 1400.0
+  }
+}

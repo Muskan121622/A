@@ -36,3 +36,5 @@ model_output/
 
 .env
 .env.example
+sklearn_model_output/
+*.pkl

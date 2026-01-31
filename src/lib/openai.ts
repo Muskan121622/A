@@ -45,9 +45,9 @@ export const analyzeImage = async (imageBase64: string, analysisType: 'disease' 
   }
 };
 
-export const chatWithAI = async (message: string, context: string = 'general') => {
+export const chatWithAI = async (message: string, context: string = 'general', targetLanguage: string = 'en-IN') => {
   try {
-    const systemPrompt = getSystemPrompt(context);
+    const systemPrompt = getSystemPrompt(context, targetLanguage);
 
     const response = await openai.chat.completions.create({
       model: "llama-3.3-70b-versatile", // Powerful text model
@@ -134,13 +134,19 @@ Format output clearly.`;
   }
 };
 
-const getSystemPrompt = (context: string) => {
+const getSystemPrompt = (context: string, targetLanguage: string = 'en-IN') => {
   const basePrompt = `You are AgriSphere AI, an expert agricultural assistant for India. 
 Powered by Llama 3 via Groq.
 Reflect the guidelines and best practices of ICAR (Indian Council of Agricultural Research) and FAO (Food and Agriculture Organization).
 Provide practical, actionable advice in simple language suitable for farmers.
 Include costs in Indian Rupees (₹) when relevant.
 Always be polite and helpful.
+
+USER LANGUAGE PREFERENCE:
+The user wants the response in language code: '${targetLanguage}'. 
+If this is a tribal or regional language (e.g., Khasi, Garo, Mizo), do your best to reply in that language or script.
+If 'en-IN', reply in English. If 'hi-IN', reply in Hindi.
+
 IMPORTANT: Do not repeat the question or the first sentence. Go straight to the answer. Keep it concise.`;
 
   switch (context) {

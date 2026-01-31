@@ -8,7 +8,7 @@ import tempfile
 import json
 from PIL import Image
 from scipy import ndimage
-from datetime import datetime
+from datetime import datetime, timedelta
 from improved_voice_assistant import AgriVoiceAssistant
 import recommendation_engine
 import pest_engine
@@ -620,8 +620,11 @@ def handle_voice_query():
     """Handle voice assistant queries"""
     try:
         data = request.json
+        print(f"Voice Query Request Data: {data}") # Debug log
         query_text = data.get('text', '')
         language_code = data.get('language', 'en-IN')
+        
+        print(f"Processing Voice Query: '{query_text}' in Language: '{language_code}'") # Debug log
         
         if not query_text:
             return jsonify({'error': 'No query text provided'}), 400
@@ -941,20 +944,7 @@ def handle_listings():
         
         return jsonify(new_listing), 201
 
-# Online Status Endpoints
-@app.route('/community/heartbeat', methods=['POST'])
-def handle_heartbeat():
-    data = request.json
-    username = data.get('username')
-    if username:
-        update_user_status(username)
-        return jsonify({'status': 'updated'})
-    return jsonify({'error': 'Username required'}), 400
 
-@app.route('/community/online', methods=['GET'])
-def get_online_users():
-    users = get_active_users()
-    return jsonify(users)
 
 # Buyer Dashboard Models & Routes
 BUYER_INTERACTIONS_FILE = "buyer_interactions.json"
@@ -1039,12 +1029,54 @@ def handle_community_posts():
         save_community_data(data)
         return jsonify({'message': 'Post created', 'id': new_post['id']}), 201
 
+# Real-Time User Tracking Endpoints
+@app.route('/community/heartbeat', methods=['POST'])
+def handle_heartbeat():
+    data = request.json
+    username = data.get('username')
+    if username:
+        update_user_status(username)
+        return jsonify({'status': 'ok'})
+    return jsonify({'error': 'Username required'}), 400
+
+@app.route('/community/online', methods=['GET'])
+def handle_online_users():
+    active_usernames = get_active_users()
+    data = load_community_data()
+    profiles = data.get('profiles', {})
+    
+    # Return enriched objects
+    enriched_users = []
+    for username in active_usernames:
+        profile = profiles.get(username, {})
+        enriched_users.append({
+            'username': username,
+            'photoUrl': profile.get('photoUrl', '')
+        })
+        
+    return jsonify(enriched_users)
+
 @app.route('/community/chat', methods=['GET', 'POST'])
 def handle_community_chat():
     data = load_community_data()
+    
     if request.method == 'GET':
-        chat = data.get('chat', [])
-        return jsonify(chat)
+        user1 = request.args.get('user1')
+        user2 = request.args.get('user2')
+        all_chats = data.get('chat', [])
+        
+        if user1 and user2:
+            # Private Chat: Filter messages between user1 and user2
+            filtered_chat = [
+                msg for msg in all_chats 
+                if (msg.get('sender') == user1 and msg.get('recipient') == user2) or 
+                   (msg.get('sender') == user2 and msg.get('recipient') == user1)
+            ]
+            return jsonify(filtered_chat)
+        else:
+            # Global Chat: Return messages with NO recipient
+            public_chat = [msg for msg in all_chats if not msg.get('recipient')]
+            return jsonify(public_chat)
     
     if request.method == 'POST':
         msg = request.json
@@ -1059,12 +1091,132 @@ def handle_community_chat():
             data['chat'] = []
             
         data['chat'].append(msg)
-        # Keep only last 100 messages
-        if len(data['chat']) > 100:
-            data['chat'] = data['chat'][-100:]
+        
+        # Retention Policy: Auto-cleanup messages older than 60 days
+        sixty_days_ago = datetime.now() - timedelta(days=60)
+        # Filter messages relative to now
+        # Parse ISO strings to datetime objects for comparison
+        cleaned_chat = []
+        for m in data['chat']:
+            try:
+                if not m.get('timestamp'):
+                     cleaned_chat.append(m) # No timestamp, keep it safe
+                     continue
+                     
+                msg_time = datetime.fromisoformat(m.get('timestamp'))
+                
+                # Normalize timezone to naive local (since sixty_days_ago is naive local)
+                if msg_time.tzinfo is not None:
+                    msg_time = msg_time.replace(tzinfo=None)
+                    
+                if msg_time > sixty_days_ago:
+                    cleaned_chat.append(m)
+            except (ValueError, TypeError) as e:
+                print(f"Error parsing date for cleanup: {e}")
+                # Keep messages with invalid timestamps to be safe
+                cleaned_chat.append(m)
+        
+        data['chat'] = cleaned_chat
             
         save_community_data(data)
         return jsonify({'message': 'Message sent'}), 201
+
+@app.route('/community/chat/<msg_id>', methods=['DELETE'])
+def delete_chat_message(msg_id):
+    data = load_community_data()
+    username = request.args.get('username') # Secure deletion: requires confirming sender
+    
+    if not username:
+        return jsonify({'error': 'Username required to delete'}), 403
+        
+    chat_list = data.get('chat', [])
+    
+    # Find message
+    msg_index = -1
+    for i, msg in enumerate(chat_list):
+        if msg.get('id') == msg_id:
+            msg_index = i
+            break
+            
+    if msg_index == -1:
+        return jsonify({'error': 'Message not found'}), 404
+        
+    # Verify ownership
+    if chat_list[msg_index].get('sender') != username:
+        return jsonify({'error': 'You can only delete your own messages'}), 403
+        
+    # Delete
+    del chat_list[msg_index]
+    data['chat'] = chat_list
+    save_community_data(data)
+    
+    return jsonify({'message': 'Message deleted successfully'}), 200
+
+@app.route('/community/notifications', methods=['GET'])
+def get_notifications():
+    username = request.args.get('username')
+    if not username:
+        return jsonify({'error': 'Username required'}), 400
+        
+    data = load_community_data()
+    all_chats = data.get('chat', [])
+    
+    # Find active alerts (e.g., unread private messages)
+    # Since we don't have true "read" status yet, we'll return all recent senders
+    # The frontend will filter based on what it has seen or just show "New"
+    
+    notifications = {} # sender -> count
+    
+    for msg in all_chats:
+        if msg.get('recipient') == username:
+            sender = msg.get('sender')
+            if sender:
+                notifications[sender] = notifications.get(sender, 0) + 1
+                
+    # Return list of senders who messaged you
+    return jsonify({
+        'unread_messages': [{'sender': sender, 'count': count} for sender, count in notifications.items()]
+    })
+
+@app.route('/user/profile', methods=['GET', 'POST'])
+def handle_user_profile():
+    data = load_community_data()
+    if 'profiles' not in data:
+        data['profiles'] = {} # username -> { name, email, photoUrl, bio }
+        
+    if request.method == 'GET':
+        username = request.args.get('username')
+        if not username:
+             return jsonify({'error': 'Username required'}), 400
+        
+        profile = data['profiles'].get(username, {})
+        return jsonify(profile)
+        
+    if request.method == 'POST':
+        profile_data = request.json
+        username = profile_data.get('username')
+        
+        if not username:
+            return jsonify({'error': 'Username required'}), 400
+            
+        data['profiles'][username] = {
+            'name': profile_data.get('name', username),
+            'email': profile_data.get('email', ''),
+            'photoUrl': profile_data.get('photoUrl', ''),
+            'bio': profile_data.get('bio', 'No bio yet.'),
+            # Extended Fields
+            'dob': profile_data.get('dob', ''),
+            'country': profile_data.get('country', 'India'),
+            'state': profile_data.get('state', ''),
+            'district': profile_data.get('district', ''),
+            'village': profile_data.get('village', ''),
+            'farmSize': profile_data.get('farmSize', ''),
+            'experience': profile_data.get('experience', ''),
+            'crops': profile_data.get('crops', '')
+        }
+        
+        save_community_data(data)
+        return jsonify({'message': 'Profile updated', 'profile': data['profiles'][username]})
 
 @app.route('/community/posts/<post_id>/comments', methods=['POST'])
 def handle_post_comment(post_id):

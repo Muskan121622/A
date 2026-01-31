@@ -20,7 +20,7 @@ const AIChat = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'नमस्ते! मैं AgriSphere AI हूं। मैं आपकी खेती में कैसे मदद कर सकता हूं?',
+      text: 'Hello! I am AgriSphere AI. Select your language to start chatting.\nनमस्ते! मैं AgriSphere AI हूं। बात करने के लिए अपनी भाषा चुनें।',
       isUser: false,
       timestamp: new Date()
     }
@@ -28,7 +28,7 @@ const AIChat = () => {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [showHindi, setShowHindi] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState('hi-IN');
 
   // Speech handling state
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
@@ -49,7 +49,7 @@ const AIChat = () => {
       recognition.current = new SpeechRecognition();
       recognition.current.continuous = false;
       recognition.current.interimResults = false;
-      recognition.current.lang = 'hi-IN'; // Hindi text listening
+      recognition.current.lang = selectedLanguage; // Dynamic language listening
 
       recognition.current.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
@@ -106,19 +106,17 @@ const AIChat = () => {
       let hindiTranslation = '';
 
       try {
-        aiResponse = await chatWithAI(inputText, 'general');
-        // Ensure no repetition in translation either
-        hindiTranslation = showHindi ? await translateToHindi(aiResponse) : '';
+        // Pass selected language to get response in that language directly
+        aiResponse = await chatWithAI(inputText, 'general', selectedLanguage);
       } catch (openaiError) {
         console.log('OpenAI failed, using mock AI:', openaiError);
         aiResponse = await mockChatWithAI(inputText);
-        hindiTranslation = aiResponse; // Mock already includes Hindi
       }
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: aiResponse,
-        hindi: hindiTranslation || aiResponse, // Ensure hindi is populated if translation skipped or failed
+        // No separate 'hindi' property needed as 'text' is already in target language
         isUser: false,
         timestamp: new Date()
       };
@@ -127,8 +125,7 @@ const AIChat = () => {
     } catch (error) {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: 'Sorry, I encountered an error. Please try again.',
-        hindi: 'माफ करें, मुझे एक त्रुटि का सामना करना पड़ा। कृपया पुनः प्रयास करें।',
+        text: 'Sorry, I encountered an error. Please try again / क्षमा करें, त्रुटि हुई।',
         isUser: false,
         timestamp: new Date()
       };
@@ -183,7 +180,12 @@ const AIChat = () => {
       setSpeakingMessageId(messageId);
 
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'hi-IN'; // Default to Hindi accent/voice
+
+      // Smart Fallback for TTS (Same as VoiceRecognition.tsx)
+      const broadlySupported = ['hi-IN', 'en-IN', 'bn-IN', 'es-ES', 'fr-FR', 'mr-IN', 'ta-IN', 'te-IN'];
+      // Use selected language if supported, otherwise fallback to Hindi (often effectively reads many Indian scripts)
+      utterance.lang = broadlySupported.includes(selectedLanguage) ? selectedLanguage : 'hi-IN';
+
       utterance.rate = 1.0;
 
       utterance.onend = () => {
@@ -191,9 +193,11 @@ const AIChat = () => {
         setIsPaused(false);
       };
 
-      utterance.onerror = () => {
+      utterance.onerror = (e) => {
+        console.error("TTS Error:", e);
         setSpeakingMessageId(null);
         setIsPaused(false);
+        // Try fallback to English if Hindi fails/silence logic needed (simplified here)
       };
 
       utteranceRef.current = utterance;
@@ -235,18 +239,30 @@ const AIChat = () => {
                     <span className="text-2xl">🤖</span>
                     <div>
                       <h3 className="font-bold">AgriSphere AI</h3>
-                      <p className="text-xs text-muted-foreground">कृषि सहायक</p>
+                      <p className="text-xs text-muted-foreground">Agricultural Assistant</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setShowHindi(!showHindi)}
-                      className="text-xs"
+                    <select
+                      value={selectedLanguage}
+                      onChange={(e) => setSelectedLanguage(e.target.value)}
+                      className="px-2 py-1 text-xs rounded border border-border bg-background"
                     >
-                      {showHindi ? 'EN' : 'हिं'}
-                    </Button>
+                      <option value="en-IN">English (India)</option>
+                      <option value="hi-IN">Hindi (हिंदी)</option>
+                      <option value="as-IN">Assamese (অসমীয়া)</option>
+                      <option value="bn-IN">Bengali (Bangla)</option>
+                      <option value="brx-IN">Bodo</option>
+                      <option value="mni-IN">Manipuri (Meitei)</option>
+                      <option value="kok-IN">Kokborok</option>
+                      <option value="lus-IN">Mizo</option>
+                      <option value="ne-IN">Nepali</option>
+                      <option value="kh-IN">Khasi</option>
+                      <option value="grt-IN">Garo</option>
+                      <option value="nj-IN">Nagamese</option>
+                      <option value="ao-IN">Ao Naga</option>
+                      <option value="ang-IN">Angami Naga</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -262,20 +278,20 @@ const AIChat = () => {
                   >
                     <div
                       className={`max-w-[85%] p-3 rounded-lg ${message.isUser
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted'
                         }`}
                     >
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                        {showHindi && message.hindi ? message.hindi : message.text}
+                        {message.text}
                       </p>
-                      {!message.isUser && (message.hindi || message.text) && (
+                      {!message.isUser && (
                         <div className="flex gap-2 mt-2 border-t border-gray-200/20 pt-2 items-center">
                           {/* Play/Pause Button */}
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleSpeak(message.hindi || message.text, message.id)}
+                            onClick={() => handleSpeak(message.text, message.id)}
                             className={`h-6 w-6 p-0 hover:bg-black/10 rounded-full ${speakingMessageId === message.id ? 'text-primary' : ''}`}
                             title={speakingMessageId === message.id && !isPaused ? "Pause" : "Listen in Hindi"}
                           >
@@ -327,7 +343,7 @@ const AIChat = () => {
                   <Input
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    placeholder={showHindi ? "अपना सवाल पूछें..." : "Ask your question..."}
+                    placeholder={selectedLanguage === 'en-IN' ? "Ask your question..." : "Ask in your language..."}
                     onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                     disabled={isLoading}
                   />
@@ -349,7 +365,7 @@ const AIChat = () => {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2 text-center">
-                  {showHindi ? "हिंदी में बोलें या टाइप करें" : "Speak or type in Hindi/English"}
+                  {selectedLanguage === 'en-IN' ? "Speak or type in English" : "Speak or type in your language"}
                 </p>
               </div>
             </Card>

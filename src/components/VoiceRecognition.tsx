@@ -19,8 +19,24 @@ const VoiceRecognition = () => {
   const utteranceRef = useRef<any>(null);
 
   const languages = [
-    { code: 'hi-IN', name: 'Hindi', flag: '🇮🇳' },
+    { code: 'hi-IN', name: 'Hindi (हिंदी)', flag: '🇮🇳' },
     { code: 'en-IN', name: 'English (India)', flag: '🇮🇳' },
+
+    // Northeast Official Languages
+    { code: 'as-IN', name: 'Assamese (অसमীয়া)', flag: 'AS' },
+    { code: 'bn-IN', name: 'Bengali (Bangla)', flag: 'TR' },
+    { code: 'brx-IN', name: 'Bodo', flag: 'AS' },
+    { code: 'mni-IN', name: 'Meitei (Manipuri)', flag: 'MN' },
+    { code: 'kok-IN', name: 'Kokborok (Tripuri)', flag: 'TR' },
+    { code: 'lus-IN', name: 'Mizo', flag: 'MZ' },
+    { code: 'ne-IN', name: 'Nepali', flag: 'SK' },
+
+    // Tribal & Regional Languages
+    { code: 'kh-IN', name: 'Khasi', flag: 'ML' },
+    { code: 'grt-IN', name: 'Garo', flag: 'ML' },
+    { code: 'nj-IN', name: 'Nagamese', flag: 'NL' },
+    { code: 'ao-IN', name: 'Ao Naga', flag: 'NL' },
+    { code: 'ang-IN', name: 'Angami Naga', flag: 'NL' },
   ];
 
   const [isSupported, setIsSupported] = useState(true);
@@ -31,7 +47,8 @@ const VoiceRecognition = () => {
       recognition.current = new SpeechRecognition();
       recognition.current.continuous = false;
       recognition.current.interimResults = false;
-      recognition.current.lang = selectedLanguage;
+      // Use Hindi or English as fallback acoustic model for tribal languages
+      recognition.current.lang = ['hi-IN', 'en-IN', 'bn-IN'].includes(selectedLanguage) ? selectedLanguage : 'en-IN';
 
       recognition.current.onresult = async (event: any) => {
         const spokenText = event.results[0][0].transcript;
@@ -45,13 +62,20 @@ const VoiceRecognition = () => {
         }
 
         try {
+          // Find full language name for better AI context
+          const langObj = languages.find(l => l.code === selectedLanguage);
+          const languageName = langObj ? langObj.name : selectedLanguage;
+
           // Use improved voice assistant backend
           const response = await fetch('http://localhost:5000/voice-query', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ text: spokenText })
+            body: JSON.stringify({
+              text: spokenText,
+              language: languageName // Send full name for AI context
+            })
           });
 
           let aiResponse = '';
@@ -71,7 +95,7 @@ const VoiceRecognition = () => {
           setHindiResponse(hindiTranslation);
 
           // Speak the response
-          speakResponse(aiResponse);
+          speakResponse(hindiTranslation); // Speak the audio_text version
         } catch (error) {
           console.error('Voice processing error:', error);
           /* Added toast for user feedback */
@@ -127,7 +151,8 @@ const VoiceRecognition = () => {
       setResponse('');
       setHindiResponse('');
       setIsListening(true);
-      recognition.current.lang = selectedLanguage;
+      // Fallback logic repeated here
+      recognition.current.lang = ['hi-IN', 'en-IN', 'bn-IN'].includes(selectedLanguage) ? selectedLanguage : 'en-IN';
       try {
         recognition.current.start();
       } catch (error) {
@@ -151,27 +176,36 @@ const VoiceRecognition = () => {
 
   const speakResponse = (text: string) => {
     if ('speechSynthesis' in window) {
-      speechSynthesis.cancel(); // Stop any ongoing speech
+      window.speechSynthesis.cancel();
+
       const utterance = new SpeechSynthesisUtterance(text);
+
+      // Smart Fallback for TTS:
+      // Browsers typically only support major languages like English, Hindi, Bengali.
+      // For tribal languages (Mizo, Garo, etc.), we must fallback to a supported voice (e.g., Hindi) 
+      // otherwise the browser might stay silent or throw an error.
+      const broadlySupported = ['hi-IN', 'en-IN', 'bn-IN', 'es-ES', 'fr-FR', 'mr-IN', 'ta-IN', 'te-IN'];
+      // Fallback to Hindi (most likely to have similar phone set) or English
+      utterance.lang = broadlySupported.includes(selectedLanguage) ? selectedLanguage : 'hi-IN';
+
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = (e) => {
+        console.error("TTS Error:", e);
+        setIsSpeaking(false);
+        // Try fallback to English if Hindi fails
+        if (utterance.lang === 'hi-IN') {
+          const fallback = new SpeechSynthesisUtterance(text);
+          fallback.lang = 'en-IN';
+          window.speechSynthesis.speak(fallback);
+        }
+      };
+
       utteranceRef.current = utterance;
-      utterance.lang = selectedLanguage;
-      utterance.rate = 0.8;
-
-      utterance.onstart = () => {
-        setIsSpeaking(true);
-      };
-
-      utterance.onend = () => {
-        setIsSpeaking(false);
-        utteranceRef.current = null;
-      };
-
-      utterance.onerror = () => {
-        setIsSpeaking(false);
-        utteranceRef.current = null;
-      };
-
-      speechSynthesis.speak(utterance);
+      window.speechSynthesis.speak(utterance);
     }
   };
 

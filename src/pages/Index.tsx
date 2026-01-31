@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import AIChat from "@/components/AIChat";
 import { useAuthStore } from "@/store/authStore";
 import { useNavigate } from "react-router-dom";
+import Navbar from "@/components/Navbar";
 
 const Index = () => {
   const { user, isAuthenticated, logout } = useAuthStore();
@@ -90,87 +91,13 @@ const Index = () => {
       <div className="fixed bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-[120px] animate-float" style={{ animationDelay: "2s" }} />
       <div className="fixed top-1/2 left-1/2 w-80 h-80 bg-secondary/10 rounded-full blur-[100px] animate-float" style={{ animationDelay: "4s" }} />
 
-      {/* Header */}
-      <motion.header
-        initial={{ y: -100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.6 }}
-        className="relative z-10 border-b border-border/50 bg-background/80 backdrop-blur-xl"
-      >
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <motion.div
-            className="flex items-center gap-2"
-            whileHover={{ scale: 1.05 }}
-            transition={{ type: "spring", stiffness: 400 }}
-          >
-            <img
-              src="/Screenshot 2025-11-21 114200.png"
-              alt="AgriSphere AI Logo"
-              className="w-10 h-10 rounded-full object-cover shadow-glow-primary border-2 border-primary/30"
-            />
-            <span className="text-2xl font-bold gradient-text">AgriSphere AI</span>
-          </motion.div>
+      {/* Floating Orbs (now with reduced opacity for video) */}
+      <div className="fixed top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-[100px] animate-float" />
+      <div className="fixed bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-[120px] animate-float" style={{ animationDelay: "2s" }} />
+      <div className="fixed top-1/2 left-1/2 w-80 h-80 bg-secondary/10 rounded-full blur-[100px] animate-float" style={{ animationDelay: "4s" }} />
 
-          <nav className="hidden md:flex items-center gap-6">
-            {[
-              { name: "Home", path: "/", public: true },
-              { name: "Features", path: "#features", public: true },
-              { name: "How It Works", path: "#how-it-works", public: true },
-              { name: "Advisory Hub", path: "/advisory-hub", public: false },
-              { name: "Disease Detection", path: "/disease-detection", public: false },
-              { name: "Digital Twin", path: "/digital-twin", public: false },
-              { name: "Community Forum", path: "/community", public: false },
-              { name: "Marketplace", path: "/marketplace", public: false },
-              { name: "Voice Assistant", path: "/voice-assistant", public: false },
-              { name: "Fertilizer AI", path: "/fertilizer-recommendation", public: false },
-              { name: "Pest Forecast", path: "/pest-prediction", public: false }
-            ].filter(item => (item.public && !isAuthenticated) || (!item.public && isAuthenticated)).map((item, i) => (
-              <motion.a
-                key={item.name}
-                href={item.path}
-                className="text-foreground/80 hover:text-foreground transition-colors relative group"
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-              >
-                {item.name}
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-primary group-hover:w-full transition-all duration-300" />
-              </motion.a>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            {!isAuthenticated && (
-              <>
-                <Button
-                  variant="outline"
-                  className="hidden md:inline-flex"
-                  onClick={() => navigate('/login')}
-                >
-                  Login
-                </Button>
-                <Button
-                  className="bg-gradient-primary hover:shadow-glow-primary transition-all duration-300"
-                  onClick={() => navigate('/signup')}
-                >
-                  Get Started
-                  <ArrowRight className="ml-2 w-4 h-4" />
-                </Button>
-              </>
-            )}
-            {isAuthenticated && (
-              <Button
-                variant="outline"
-                className="hidden md:inline-flex"
-                onClick={handleLogout}
-              >
-                Logout
-              </Button>
-            )}
-          </div>
-        </div>
-      </motion.header>
+      {/* Shared Navbar */}
+      <Navbar />
 
       {/* Hero Section */}
       <section className="relative z-10 container mx-auto px-4 py-20 md:py-32">

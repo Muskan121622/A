@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/use-toast";
-import { MessageSquare, Send, Users, ThumbsUp, MessageCircle, Search, User } from 'lucide-react';
+import { MessageSquare, Send, Users, ThumbsUp, MessageCircle, Search, User, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import Navbar from '../components/Navbar';
 import axios from 'axios';
@@ -38,6 +38,27 @@ interface ChatMessage {
     timestamp: string;
 }
 
+interface UserProfile {
+    username: string;
+    photoUrl: string;
+}
+
+// Helper for Date Grouping
+const formatDateLabel = (isoDate: string) => {
+    const date = new Date(isoDate);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) {
+        return "Today";
+    } else if (date.toDateString() === yesterday.toDateString()) {
+        return "Yesterday";
+    } else {
+        return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+};
+
 const Community = () => {
     const { toast } = useToast();
     const [activeTab, setActiveTab] = useState("forum");
@@ -56,9 +77,17 @@ const Community = () => {
     // Chat Inputs
     const [chatInput, setChatInput] = useState("");
     const [username, setUsername] = useState(() => {
-        return localStorage.getItem("agrisphere_username") || `Farmer_${Math.floor(Math.random() * 1000)}`;
+        const stored = localStorage.getItem("agrisphere_username");
+        if (stored) return stored;
+
+        const newRandom = `Farmer_${Math.floor(Math.random() * 1000)}`;
+        localStorage.setItem("agrisphere_username", newRandom);
+        return newRandom;
     });
-    const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+    // Updated to store objects instead of simple strings
+    const [onlineUsers, setOnlineUsers] = useState<{ username: string, photoUrl?: string }[]>([]);
+    const [activePrivateChat, setActivePrivateChat] = useState<string | null>(null);
+    const [notifications, setNotifications] = useState<{ [key: string]: number }>({}); // sender -> count
 
     const API_URL = 'http://localhost:5000';
 
@@ -72,9 +101,12 @@ const Community = () => {
         if (activeTab === 'chat') {
             fetchChat();
             fetchOnlineUsers();
+            fetchNotifications();
+
             const interval = setInterval(() => {
                 fetchChat();
                 fetchOnlineUsers();
+                fetchNotifications();
             }, 3000); // Faster polling for chat
 
             // Heartbeat
@@ -90,14 +122,49 @@ const Community = () => {
                 clearInterval(heartbeat);
             };
         }
-    }, [activeTab, username]);
+    }, [activeTab, username, activePrivateChat]); // re-fetch when chat mode changes
 
     const fetchOnlineUsers = async () => {
         try {
             const res = await axios.get(`${API_URL}/community/online`);
+            // Backend now returns [{username, photoUrl}]
             setOnlineUsers(res.data);
         } catch (e) {
             console.error("Error fetching online users", e);
+        }
+    };
+
+    const fetchNotifications = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/community/notifications?username=${username}`);
+            const unreadData = res.data.unread_messages;
+            const newNotifs: { [key: string]: number } = {};
+
+            unreadData.forEach((item: any) => {
+                newNotifs[item.sender] = item.count;
+
+                // Show toast if count increased and NOT currently chatting with them
+                const prevCount = notifications[item.sender] || 0;
+                if (item.count > prevCount && activePrivateChat !== item.sender) {
+                    // Play notification sound
+                    try {
+                        const audio = new Audio("https://cdn.freesound.org/previews/536/536108_2738741-lq.mp3"); // Simple ping sound
+                        audio.play().catch(e => console.log("Audio play failed (interaction needed first)", e));
+                    } catch (e) {
+                        console.error("Audio error", e);
+                    }
+
+                    toast({
+                        title: "New Message",
+                        description: `Message from ${item.sender}`,
+                        // Action to switch chat
+                        action: <Button variant="outline" size="sm" onClick={() => setActivePrivateChat(item.sender)}>View</Button>
+                    });
+                }
+            });
+            setNotifications(newNotifs);
+        } catch (error) {
+            console.error("Error fetching notifications", error);
         }
     };
 
@@ -116,10 +183,37 @@ const Community = () => {
 
     const fetchChat = async () => {
         try {
-            const res = await axios.get(`${API_URL}/community/chat`);
-            setChatMessages(res.data);
+            let url = `${API_URL}/community/chat`;
+            const params: any = {};
+            if (activePrivateChat) {
+                params.user1 = username;
+                params.user2 = activePrivateChat;
+            }
+
+            const res = await axios.get(url, { params });
+            const newMessages = res.data;
+
+            // Avoid unnecessary re-renders
+            // Note: In a real app we'd compare IDs or last timestamp
+            setChatMessages(newMessages);
+
+            // Update notifications if logic existed for it (simplified here)
         } catch (error) {
             console.error("Error fetching chat:", error);
+        }
+    };
+
+    const handleDeleteMessage = async (msgId: string) => {
+        try {
+            await axios.delete(`${API_URL}/community/chat/${msgId}`, {
+                params: { username }
+            });
+            // Optimistic update
+            setChatMessages(prev => prev.filter(msg => msg.id !== msgId));
+            toast({ title: "Deleted", description: "Message removed." });
+        } catch (error) {
+            console.error("Failed to delete message", error);
+            toast({ title: "Error", description: "Could not delete message.", variant: "destructive" });
         }
     };
 
@@ -172,10 +266,14 @@ const Community = () => {
         if (!chatInput.trim()) return;
 
         try {
-            const msg = {
-                sender: username, // Use dynamic username
+            const msg: any = {
+                sender: username,
                 text: chatInput
             };
+
+            if (activePrivateChat) {
+                msg.recipient = activePrivateChat;
+            }
 
             await axios.post(`${API_URL}/community/chat`, msg);
             setChatInput("");
@@ -223,7 +321,7 @@ const Community = () => {
                         </TabsTrigger>
                     </TabsList>
 
-                    {/* FORUM TAB */}
+                    {/* FORUM TAB CONTENT (unchanged) */}
                     <TabsContent value="forum" className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {/* Post List */}
@@ -376,79 +474,161 @@ const Community = () => {
                     {/* LIVE CHAT TAB */}
                     <TabsContent value="chat" className="h-[600px] flex gap-4">
                         <Card className="flex-1 bg-slate-900 border-slate-800 flex flex-col">
-                            {/* ... header ... */}
-                            <CardHeader className="border-b border-slate-800 pb-4">
-                                <CardTitle className="flex items-center gap-2 text-white">
-                                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                    Live Farmers Chat
-                                </CardTitle>
+                            {/* Chat Header */}
+                            <CardHeader className="border-b border-slate-800 pb-4 bg-slate-900/50">
+                                <div className="flex justify-between items-center">
+                                    <CardTitle className="flex items-center gap-2 text-white">
+                                        <div className={`w-2 h-2 rounded-full ${activePrivateChat ? 'bg-blue-500' : 'bg-green-500'} animate-pulse`}></div>
+                                        {activePrivateChat ? `Chat with ${activePrivateChat}` : 'Live Farmers Chat (Global)'}
+                                    </CardTitle>
+                                    {activePrivateChat && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-slate-400 hover:text-white hover:bg-slate-800"
+                                            onClick={() => setActivePrivateChat(null)}
+                                        >
+                                            Back to Global Chat
+                                        </Button>
+                                    )}
+                                </div>
                             </CardHeader>
-                            <ScrollArea className="flex-1 p-4">
+                            <ScrollArea className="flex-1 p-4 bg-black/20">
                                 <div className="space-y-4">
-                                    {chatMessages.length === 0 ? (
-                                        <div className="text-center text-slate-500 mt-20">Start the conversation!</div>
+                                    {(activePrivateChat && chatMessages.length === 0) ? (
+                                        <div className="text-center text-slate-500 mt-20">
+                                            Start a private conversation!
+                                        </div>
                                     ) : (
-                                        chatMessages.map((msg, i) => (
-                                            <div key={i} className={`flex gap-3 ${msg.sender === username ? 'flex-row-reverse' : ''}`}>
-                                                <Avatar className="h-8 w-8">
-                                                    <AvatarFallback className="bg-slate-800 text-slate-300">{msg.sender[0]}</AvatarFallback>
-                                                </Avatar>
-                                                <div className={`rounded-lg p-3 max-w-[80%] group relative ${msg.sender === username ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-200'}`}>
-                                                    <div className="text-xs opacity-70 mb-1 flex justify-between gap-4">
-                                                        <span>{msg.sender}</span>
-                                                        <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                    </div>
-                                                    <p className="text-sm">{msg.text}</p>
-                                                    {msg.sender !== username && (
-                                                        <button
-                                                            onClick={() => handleTranslate(msg.id, msg.text)}
-                                                            className="absolute -right-8 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-slate-800 border border-slate-700 rounded-full text-slate-400 hover:text-white"
-                                                            title="Translate to Hindi"
-                                                        >
-                                                            <div className="w-4 h-4">A/अ</div>
-                                                        </button>
+                                        chatMessages.map((msg, i) => {
+                                            const showDate = i === 0 || formatDateLabel(msg.timestamp) !== formatDateLabel(chatMessages[i - 1].timestamp);
+
+                                            return (
+                                                <div key={msg.id || i}>
+                                                    {showDate && (
+                                                        <div className="flex justify-center my-4">
+                                                            <span className="bg-slate-800 text-slate-400 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
+                                                                {formatDateLabel(msg.timestamp)}
+                                                            </span>
+                                                        </div>
                                                     )}
+                                                    <div className={`flex gap-3 mb-4 ${msg.sender === username ? 'flex-row-reverse' : 'flex-row'}`}>
+                                                        <Avatar className="h-8 w-8 border border-white/10">
+                                                            <AvatarFallback className={`text-white ${msg.sender === username ? 'bg-blue-600' : 'bg-slate-700'}`}>
+                                                                {msg.sender[0]}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                        <div className={`rounded-2xl p-3 max-w-[80%] group relative transition-all ${msg.sender === username
+                                                            ? 'bg-blue-600 text-white rounded-tr-none'
+                                                            : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'
+                                                            }`}>
+                                                            <div className="text-xs opacity-70 mb-1 flex justify-between gap-4">
+                                                                <span>{msg.sender === username ? 'You' : msg.sender}</span>
+                                                                <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                            </div>
+                                                            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
+
+                                                            {/* Actions Group */}
+                                                            <div className={`absolute top-2 flex gap-1 transition-opacity opacity-0 group-hover:opacity-100 ${msg.sender === username ? '-left-16' : '-right-16'}`}>
+                                                                {/* Translate Button (For others' messages) */}
+                                                                {msg.sender !== username && (
+                                                                    <button
+                                                                        onClick={() => handleTranslate(msg.id, msg.text)}
+                                                                        className="p-1.5 bg-slate-800 border border-slate-700 rounded-full text-slate-400 hover:text-white shadow-lg"
+                                                                        title="Translate to Hindi"
+                                                                    >
+                                                                        <div className="w-4 h-4 flex items-center justify-center text-[10px] font-bold">अ</div>
+                                                                    </button>
+                                                                )}
+
+                                                                {/* Delete Button (For own messages) */}
+                                                                {msg.sender === username && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            if (confirm("Delete this message?")) handleDeleteMessage(msg.id);
+                                                                        }}
+                                                                        className="p-1.5 bg-slate-800 border border-red-500/30 rounded-full text-red-400 hover:bg-red-500 hover:text-white shadow-lg transition-colors"
+                                                                        title="Delete Message"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))
+                                            );
+                                        })
                                     )}
                                 </div>
                             </ScrollArea>
-                            {/* ... input ... */}
-                            <div className="p-4 border-t border-slate-800 bg-black/20">
+                            {/* Chat Input */}
+                            <div className="p-4 border-t border-slate-800 bg-slate-900/50 backdrop-blur-sm">
                                 <div className="flex gap-2">
                                     <Input
-                                        placeholder="Type a message..."
-                                        className="bg-slate-800 border-slate-700 text-white"
+                                        placeholder={activePrivateChat ? `Message ${activePrivateChat}...` : "Message everyone..."}
+                                        className="bg-black/50 border-slate-700 text-white focus:ring-blue-500/50"
                                         value={chatInput}
                                         onChange={(e) => setChatInput(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                                     />
-                                    <Button size="icon" className="bg-blue-600 hover:bg-blue-700" onClick={handleSendMessage}>
+                                    <Button size="icon" className={`${activePrivateChat ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'} transition-colors`} onClick={handleSendMessage}>
                                         <Send className="w-4 h-4" />
                                     </Button>
                                 </div>
                             </div>
                         </Card>
-                        {/* ... sidebar ... */}
+                        {/* Sidebar: Online Users */}
                         <Card className="w-64 bg-slate-900 border-slate-800 hidden md:flex flex-col">
-                            <CardHeader>
-                                <CardTitle className="text-sm text-slate-400 uppercase tracking-wider">Online Farmers</CardTitle>
+                            <CardHeader className="border-b border-slate-800/50 pb-3">
+                                <CardTitle className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Users className="w-3 h-3" /> Online Farmers ({onlineUsers.length})
+                                </CardTitle>
                             </CardHeader>
-                            <CardContent>
-                                <div className="space-y-3">
-                                    {onlineUsers.map((name, i) => (
-                                        <div key={i} className="flex items-center gap-3 animate-in fade-in slide-in-from-right-2">
-                                            <div className="relative">
-                                                <Avatar className="h-8 w-8 border border-slate-700">
-                                                    <AvatarFallback>{name[0]}</AvatarFallback>
-                                                </Avatar>
-                                                <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-slate-900 rounded-full"></div>
+                            <CardContent className="pt-4 p-2">
+                                <ScrollArea className="h-[480px]">
+                                    <div className="space-y-1">
+                                        {onlineUsers.map((user, i) => (
+                                            <div
+                                                key={i}
+                                                onClick={() => user.username !== username && setActivePrivateChat(user.username)}
+                                                className={`flex items-center gap-3 p-2 rounded-lg transition-all cursor-pointer ${user.username === username ? 'opacity-50 cursor-default' :
+                                                    activePrivateChat === user.username ? 'bg-blue-600/20 border border-blue-600/50' : 'hover:bg-slate-800'
+                                                    }`}
+                                            >
+                                                <div className="relative">
+                                                    <Avatar className="h-8 w-8 border border-white/10">
+                                                        <AvatarImage src={user.photoUrl} />
+                                                        <AvatarFallback className="bg-slate-700 text-slate-300 font-medium">{user.username[0]}</AvatarFallback>
+                                                    </Avatar>
+
+                                                    {/* Notification Badge */}
+                                                    {notifications[user.username] > 0 && user.username !== activePrivateChat && (
+                                                        <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full z-10 animate-bounce">
+                                                            {notifications[user.username] > 9 ? '9+' : notifications[user.username]}
+                                                        </div>
+                                                    )}
+
+                                                    <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-slate-900 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className={`text-sm font-medium ${activePrivateChat === user.username ? 'text-blue-400' : 'text-slate-300'}`}>
+                                                        {user.username} {user.username === username && '(You)'}
+                                                    </span>
+                                                    {user.username !== username && (
+                                                        <span className="text-[10px] text-slate-500">
+                                                            {notifications[user.username] > 0 && user.username !== activePrivateChat ?
+                                                                <span className="text-red-400 font-semibold">{notifications[user.username]} new messages</span>
+                                                                : 'Click to chat'
+                                                            }
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <span className="text-sm text-slate-300">{name} {name === username && '(You)'}</span>
-                                        </div>
-                                    ))}
-                                </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
                             </CardContent>
                         </Card>
                     </TabsContent>
